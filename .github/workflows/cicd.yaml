@@ -1,0 +1,57 @@
+# El nombre que verás en la pestaña "Actions" de GitHub para identificar este pipeline
+name: Build
+
+# EVENTOS DISPARADORES: ¿Cuándo se despierta este pipeline?
+on:
+  push:
+    branches: [ main ] # Se activa si alguien hace un 'git push' directo a la rama main
+  pull_request:        # ¡OJO AQUÍ! Se activa también si alguien abre una Pull Request (un intento de fusión) hacia CUALQUIER rama
+
+# TRABAJOS: Las tareas pesadas que se van a ejecutar
+jobs:
+  build:
+    # Levanta una máquina virtual con la última versión de Linux Ubuntu totalmente limpia
+    runs-on: ubuntu-latest
+
+    # PASOS: La lista de comandos secuenciales que ejecutará esa máquina limpia
+    steps:
+      # Paso 1: Descarga el código fuente de tu repositorio dentro de la máquina virtual
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Paso 2: Instala el entorno de ejecución de Java en la máquina
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin  # La distribución OpenJDK recomendada
+          java-version: "21"     # Versión de Java (debe coincidir con tu pom.xml)
+          cache: maven           # Guarda las librerías descargadas para que el próximo push sea más rápido
+
+      # Paso 3: Limpia y empaqueta el proyecto
+      # -B: Modo batch (no interactivo, sin ruido en los logs)
+      # clean: Borra la carpeta 'target' vieja para empezar de cero
+      # package: Compila, pasa los tests automáticos y genera el archivo .jar ejecutable
+      - name: Build with Maven
+        run: mvn -B clean package --file pom.xml
+
+      # Paso 4: Genera la documentación técnica de tu código
+      # Lee los comentarios de tus clases (/** ... */) y crea una web HTML con el manual técnico
+      - name: Generate JavaDoc
+        run: mvn javadoc:javadoc
+
+      # Paso 5: Guardar el ejecutable (Evita que se destruya al apagar la máquina)
+      # Coge el archivo .jar generado en la carpeta target/ y lo sube a la web de GitHub con el nombre 'calculator-jar'
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calculator-jar
+          path: target/*.jar
+
+      # Paso 6: Guardar la documentación (Evita que se destruya al apagar la máquina)
+      # Maven guarda las páginas HTML del JavaDoc en 'target/site/apidocs'. 
+      # Este paso las empaqueta en un .zip llamado 'javadoc' para que el profesor pueda descargarlo y corregirlo
+      - name: Upload JavaDoc artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: javadoc
+          path: target/site/apidocs
